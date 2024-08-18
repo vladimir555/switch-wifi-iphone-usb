@@ -77,7 +77,7 @@ on setNetworkPriority(primaryService, secondaryService)
     set priorityCommand to "networksetup -ordernetworkservices " & quotedServices
 
     -- Debug information
-    logMessage("Executing command: " & priorityCommand)
+    logMessage(priorityCommand)
 
     try
         do shell script priorityCommand
@@ -107,16 +107,12 @@ on mainLogic()
             logMessage("Error: could not retrieve Wi-Fi network name.")
             delay 60
             return
-        else
-            logMessage("Wi-Fi network: " & wifiServiceName)
         end if
 
         if iPhoneUSBServiceName is "" then
             logMessage("Error: could not find iPhone USB connection.")
             delay 60
             return
-        else
-            logMessage("iPhone USB: " & iPhoneUSBServiceName)
         end if
 
         -- Check internet availability via Wi-Fi
