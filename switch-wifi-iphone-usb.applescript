@@ -1,65 +1,67 @@
--- IP-адрес для проверки доступности интернета
-global checkIP
-set checkIP to "8.8.8.8"
+-- IP address to check for internet availability
+global pingIP
+global pingCount
+set pingIP      to "8.8.8.8"
+set pingCount   to 10
 
--- Функция для записи сообщений в лог
+-- Function to log messages
 on logMessage(message)
-    do shell script "echo " & quoted form of message & " >> ~/switch-wifi.log"
+    do shell script "echo " & quoted form of message & " >> ~/switch-wifi-iphone-usb.log"
 end logMessage
 
--- Функция для получения списка всех сетевых сервисов
+-- Function to get the list of all network services
 on getAllNetworkServices()
     try
         set networkServices to do shell script "networksetup -listallnetworkservices | sed 1d | awk '{if (substr($0, 1, 1) == \"*\") print substr($0, 2); else print $0}'"
         return paragraphs of networkServices
     on error errMsg
-        logMessage("Ошибка при получении списка сетевых сервисов: " & errMsg)
+        logMessage("Error getting list of network services: " & errMsg)
         return {}
     end try
 end getAllNetworkServices
 
--- Функция для получения имени текущей Wi-Fi сети
+-- Function to get the current Wi-Fi network name
 on getWiFiServiceName()
     try
         set wifiName to do shell script "networksetup -getairportnetwork en0 | awk -F': ' '{print $2}'"
         return "Wi-Fi"
     on error errMsg
-        logMessage("Ошибка при получении имени Wi-Fi сети: " & errMsg)
+        logMessage("Error getting Wi-Fi network name: " & errMsg)
         return ""
     end try
 end getWiFiServiceName
 
--- Функция для определения имени сети iPhone по USB
+-- Function to get the name of the iPhone USB network
 on getIPhoneUSBServiceName()
     try
         set iphoneUSB to do shell script "networksetup -listnetworkserviceorder | grep 'iPhone USB' | head -n 1 | awk -F'\\) ' '{print $2}'"
         return "iPhone USB"
     on error errMsg
-        logMessage("Ошибка при получении имени iPhone USB: " & errMsg)
+        logMessage("Error getting iPhone USB network name: " & errMsg)
         return ""
     end try
 end getIPhoneUSBServiceName
 
--- Функция для проверки доступности интернета через Wi-Fi
+-- Function to check internet availability via Wi-Fi
 on isInternetAvailableViaWiFi()
     set wifiInterface to "en0"
     try
-        set script_string to "ping -c 3 -b " & wifiInterface & " " & checkIP & " | grep '10 packets received'"
+        set script_string to "ping -c " & pingCount & " -b " & wifiInterface & " " & pingIP & " | grep '" & pingCount & " packets received'"
         logMessage(script_string)
         set pingResult to do shell script script_string
         return (pingResult is not "")
     on error errMsg
-        logMessage("Ошибка при проверке интернета через Wi-Fi: " & errMsg)
+        logMessage("Error checking internet via Wi-Fi: " & errMsg)
         return false
     end try
 end isInternetAvailableViaWiFi
 
--- Функция для установки приоритета сети
+-- Function to set network priority
 on setNetworkPriority(primaryService, secondaryService)
-    -- Получаем все доступные сетевые сервисы
+    -- Get all available network services
     set allServices to getAllNetworkServices()
 
-    -- Переставляем приоритеты
+    -- Rearrange priorities
     set serviceOrder to {}
     set end of serviceOrder to primaryService
     set end of serviceOrder to secondaryService
@@ -70,21 +72,21 @@ on setNetworkPriority(primaryService, secondaryService)
         end if
     end repeat
 
-    -- Формируем команду для изменения приоритета
+    -- Form command to change priority
     set quotedServices  to "\"" & join(serviceOrder, "\" \"")
     set priorityCommand to "networksetup -ordernetworkservices " & quotedServices
 
-    -- Отладочная информация
-    logMessage("Выполнение команды: " & priorityCommand)
+    -- Debug information
+    logMessage("Executing command: " & priorityCommand)
 
     try
         do shell script priorityCommand
     on error errMsg
-        logMessage("Ошибка при установке приоритета: " & errMsg)
+        logMessage("Error setting priority: " & errMsg)
     end try
 end setNetworkPriority
 
--- Функция объединения элементов в строку
+-- Function to join elements into a string
 on join(listItems, delimiter)
     set theString to ""
     repeat with anItem in listItems
@@ -93,7 +95,7 @@ on join(listItems, delimiter)
     return text 1 thru -2 of theString
 end join
 
--- Основная логика
+-- Main logic
 on mainLogic()
     set wifiServiceName         to getWiFiServiceName()
     set iPhoneUSBServiceName   to getIPhoneUSBServiceName()
@@ -102,43 +104,43 @@ on mainLogic()
     repeat
 
         if wifiServiceName is "" then
-            logMessage("Ошибка: не удалось получить имя сети Wi-Fi.")
+            logMessage("Error: could not retrieve Wi-Fi network name.")
             delay 60
             return
         else
-            logMessage("Wi-Fi сеть: " & wifiServiceName)
+            logMessage("Wi-Fi network: " & wifiServiceName)
         end if
 
         if iPhoneUSBServiceName is "" then
-            logMessage("Ошибка: не удалось найти подключение iPhone USB.")
+            logMessage("Error: could not find iPhone USB connection.")
             delay 60
             return
         else
             logMessage("iPhone USB: " & iPhoneUSBServiceName)
         end if
 
-        -- Проверка доступности интернета через Wi-Fi
+        -- Check internet availability via Wi-Fi
         if isInternetAvailableViaWiFi() then
-            logMessage("Переключение на " & wifiServiceName & " ...")
+            logMessage("Switching to " & wifiServiceName & " ...")
             if currentServiceName is not wifiServiceName then
                 setNetworkPriority(wifiServiceName, iPhoneUSBServiceName)
                 set currentServiceName to wifiServiceName
             else
-                logMessage(wifiServiceName & " уже имеет приоритет.")
+                logMessage(wifiServiceName & " already has priority.")
             end if
         else
-        logMessage("Переключение на " & iPhoneUSBServiceName & " ...")
+            logMessage("Switching to " & iPhoneUSBServiceName & " ...")
             if currentServiceName is not iPhoneUSBServiceName then
                 setNetworkPriority(iPhoneUSBServiceName, wifiServiceName)
                 set currentServiceName to iPhoneUSBServiceName
             else
-                logMessage(iPhoneUSBServiceName & " уже имеет приоритет.")
+                logMessage(iPhoneUSBServiceName & " already has priority.")
             end if
         end if
 
-        delay 60 -- Периодическая проверка каждые 60 секунд
+        delay 60 -- Periodic check every 60 seconds
     end repeat
 end mainLogic
 
--- Запуск основной логики
+-- Start main logic
 mainLogic()
